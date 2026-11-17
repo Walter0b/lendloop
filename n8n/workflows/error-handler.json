@@ -1,0 +1,120 @@
+{
+  "id": "llErrorHandler01",
+  "name": "LendLoop: error handler",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all"
+  },
+  "nodes": [
+    {
+      "name": "On workflow error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Build failure report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const { execution = {}, workflow = {}, trigger } = $input.first().json;\nconst error = execution.error || (trigger && trigger.error) || {};\nconst report = {\n  type: 'workflow.failure',\n  executionId: String(execution.id || `trigger-${Date.now()}`),\n  workflow: String(workflow.name || 'unknown'),\n  node: String(execution.lastNodeExecuted || (error.node && error.node.name) || 'unknown'),\n  message: String(error.message || 'Unknown error').slice(0, 500),\n};\nconsole.error(`[LendLoop error] ${report.workflow} failed at ${report.node}: ${report.message}`);\nreturn [{ json: { writeBack: report } }];\n"
+      }
+    },
+    {
+      "name": "Sign report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// HTTP retries reuse this timestamp, so they must happen within 5 minutes.\nconst crypto = require('crypto');\nconst payload = JSON.stringify($json.writeBack);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst signature = 'v1=' + crypto\n  .createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET)\n  .update(`${timestamp}.${payload}`)\n  .digest('hex');\nreturn { json: { ...$json, signed: { payload, timestamp, signature } } };\n"
+      }
+    },
+    {
+      "name": "Report to Convex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL }}/automation/failures",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.signed.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signed.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $json.signed.payload }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On workflow error": {
+      "main": [
+        [
+          {
+            "node": "Build failure report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build failure report": {
+      "main": [
+        [
+          {
+            "node": "Sign report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign report": {
+      "main": [
+        [
+          {
+            "node": "Report to Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "tags": []
+}

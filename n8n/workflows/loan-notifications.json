@@ -1,0 +1,279 @@
+{
+  "id": "llLoanNotify0001",
+  "name": "LendLoop: loan notifications",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "llErrorHandler01"
+  },
+  "nodes": [
+    {
+      "name": "Loan event webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "6f1c2b7e-1d55-4c4e-9a43-1f2d7b9c0a11",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lendloop/loan-event",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// v1=hex(HMAC_SHA256(secret, `${ts}.${payload}`))\nconst crypto = require('crypto');\nconst MAX_SKEW_SECONDS = 300;\nconst req = $input.first().json;\nconst timestamp = req.headers['x-lendloop-timestamp'];\nconst signature = String(req.headers['x-lendloop-signature'] || '');\nconst payload = req.body && req.body.payload;\nconst reject = (reason) => [{ json: { valid: false, reason } }];\n\nif (!timestamp || !signature || typeof payload !== 'string') return reject('missing');\nif (Math.abs(Date.now() / 1000 - Number(timestamp)) > MAX_SKEW_SECONDS) return reject('stale');\nconst expected = 'v1=' + crypto\n  .createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET)\n  .update(`${timestamp}.${payload}`)\n  .digest('hex');\nconst a = Buffer.from(expected);\nconst b = Buffer.from(signature);\nif (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return reject('bad_signature');\n\nconst event = JSON.parse(payload);\nif (event.kind !== 'loan-event' || event.version !== 1) return reject('unsupported');\nreturn [{ json: { valid: true, event } }];\n"
+      }
+    },
+    {
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "valid-signature",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Accept (202)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"accepted\": true } }}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "name": "Reject (401)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.reason } }}",
+        "options": {
+          "responseCode": 401
+        }
+      }
+    },
+    {
+      "name": "Notify recipient",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mock channel: logs the message instead of sending it.\nconst e = $json.event;\nconst { toolName, startDate, endDate, counterpartFirstName: who } = e.loan;\nconst lines = {\n  'loan.requested': `${who} would like to borrow your ${toolName} from ${startDate} to ${endDate}.`,\n  'loan.approved': `${who} approved your request for the ${toolName} (${startDate} to ${endDate}).`,\n  'loan.declined': `${who} cannot lend the ${toolName} for ${startDate} to ${endDate} this time.`,\n  'loan.cancelled': e.recipient.role === 'borrower'\n    ? `your loan of the ${toolName} (${startDate} to ${endDate}) was cancelled.`\n    : `${who} cancelled the request for your ${toolName}.`,\n  'loan.returned': `${who} marked the ${toolName} as returned. Thanks for borrowing!`,\n};\nconst text = `Hi ${e.recipient.firstName}, ${lines[e.type]}`;\nif (e.recipient.email.endsWith('@fail.test')) throw new Error('Simulated delivery failure');\nconsole.log(`[LendLoop notify] to=${e.recipient.email} event=${e.eventId} :: ${text}`);\nreturn { json: { writeBack: { type: 'notification.result', eventId: e.eventId, status: 'notified' } } };\n"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "name": "Notification failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const event = $('Verify signature').first().json.event;\nconst detail = String($json.error || 'notification failed').slice(0, 200);\nreturn { json: { writeBack: { type: 'notification.result', eventId: event.eventId, status: 'failed', detail } } };\n"
+      }
+    },
+    {
+      "name": "Sign write-back",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -100
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// HTTP retries reuse this timestamp, so they must happen within 5 minutes.\nconst crypto = require('crypto');\nconst payload = JSON.stringify($json.writeBack);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst signature = 'v1=' + crypto\n  .createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET)\n  .update(`${timestamp}.${payload}`)\n  .digest('hex');\nreturn { json: { ...$json, signed: { payload, timestamp, signature } } };\n"
+      }
+    },
+    {
+      "name": "Write status to Convex",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL }}/automation/notifications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.signed.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signed.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $json.signed.payload }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Loan event webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify signature": {
+      "main": [
+        [
+          {
+            "node": "Signature valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature valid?": {
+      "main": [
+        [
+          {
+            "node": "Accept (202)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject (401)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept (202)": {
+      "main": [
+        [
+          {
+            "node": "Notify recipient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify recipient": {
+      "main": [
+        [
+          {
+            "node": "Sign write-back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notification failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notification failed": {
+      "main": [
+        [
+          {
+            "node": "Sign write-back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign write-back": {
+      "main": [
+        [
+          {
+            "node": "Write status to Convex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "tags": []
+}

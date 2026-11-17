@@ -1,0 +1,15 @@
+.git
+.github
+.next
+backups
+node_modules
+secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.staging.example
+.release-*
+*.log
+*.tsbuildinfo
+.DS_Store

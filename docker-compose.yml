@@ -1,0 +1,49 @@
+x-n8n: &n8n
+  image: docker.n8n.io/n8nio/n8n:2.47.7
+  # Docker Compose reads .env automatically. Only these four
+  # values reach n8n, so workflows ($env) never see the Clerk or Convex admin keys.
+  environment:
+    N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?set in .env}
+    LENDLOOP_WEBHOOK_SECRET: ${LENDLOOP_WEBHOOK_SECRET:?set in .env}
+    CONVEX_SITE_URL: ${CONVEX_SITE_URL:?set in .env}
+    WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+    N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"   # for $env.LENDLOOP_WEBHOOK_SECRET in Code nodes
+    NODE_FUNCTION_ALLOW_BUILTIN: crypto     # for HMAC in Code nodes
+    CODE_ENABLE_STDOUT: "true"              # mock notifications go to the logs
+    N8N_DIAGNOSTICS_ENABLED: "false"
+    GENERIC_TIMEZONE: ${TZ:-Africa/Douala}
+  volumes:
+    - n8n_data:/home/node/.n8n
+    - ./n8n:/lendloop:ro
+
+services:
+  n8n:
+    <<: *n8n
+    ports: ["5678:5678"]
+    restart: unless-stopped
+
+  # docker compose run --rm n8n-setup
+  n8n-setup:
+    <<: *n8n
+    profiles: [setup]
+    entrypoint: ["/bin/sh", "/lendloop/setup.sh"]
+
+  # --profile tunnel: public URL for Convex Cloud
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate --url http://n8n:5678
+
+  # --profile convex: self-hosted Convex
+  convex:
+    image: ghcr.io/convex/convex-backend:latest
+    profiles: [convex]
+    ports: ["3210:3210", "3211:3211"]
+    environment:
+      CONVEX_CLOUD_ORIGIN: http://127.0.0.1:3210
+      CONVEX_SITE_ORIGIN: http://127.0.0.1:3211
+    volumes: [convex_data:/convex/data]
+
+volumes:
+  n8n_data:
+  convex_data:

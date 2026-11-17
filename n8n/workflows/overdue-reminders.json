@@ -1,0 +1,305 @@
+{
+  "id": "llOverdueRemind1",
+  "name": "LendLoop: overdue reminders",
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "llErrorHandler01"
+  },
+  "nodes": [
+    {
+      "name": "Every day at 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Build overdue query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { writeBack: { type: 'overdue.query' } } }];\n"
+      }
+    },
+    {
+      "name": "Sign query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// HTTP retries reuse this timestamp, so they must happen within 5 minutes.\nconst crypto = require('crypto');\nconst payload = JSON.stringify($json.writeBack);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst signature = 'v1=' + crypto\n  .createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET)\n  .update(`${timestamp}.${payload}`)\n  .digest('hex');\nreturn { json: { ...$json, signed: { payload, timestamp, signature } } };\n"
+      }
+    },
+    {
+      "name": "Fetch overdue loans",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL }}/automation/overdue-loans",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.signed.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signed.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $json.signed.payload }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "name": "One item per loan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const { loans = [] } = $input.first().json;\nconsole.log(`[LendLoop overdue] ${loans.length} overdue loan(s) to remind`);\nreturn loans.map((loan) => ({ json: { loan } }));\n"
+      }
+    },
+    {
+      "name": "Send reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Mock channel: logs the reminder instead of sending it.\nconst { loan } = $json;\nconst days = loan.daysOverdue === 1 ? '1 day' : `${loan.daysOverdue} days`;\nconst text = `Hi ${loan.borrower.firstName}, the ${loan.toolName} was due back on ${loan.endDate} (${days} ago). Please return it soon.`;\nif (loan.borrower.email.endsWith('@fail.test')) throw new Error('Simulated delivery failure');\nconsole.log(`[LendLoop reminder] to=${loan.borrower.email} key=${loan.reminderKey} :: ${text}`);\nreturn { json: { writeBack: { type: 'reminder.result', reminderKey: loan.reminderKey, status: 'sent' } } };\n"
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "name": "Reminder failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const { loan } = $('One item per loan').item.json;\nconst detail = String($json.error || 'reminder failed').slice(0, 200);\nreturn { json: { writeBack: { type: 'reminder.result', reminderKey: loan.reminderKey, status: 'failed', detail } } };\n"
+      }
+    },
+    {
+      "name": "Sign write-back",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// HTTP retries reuse this timestamp, so they must happen within 5 minutes.\nconst crypto = require('crypto');\nconst payload = JSON.stringify($json.writeBack);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst signature = 'v1=' + crypto\n  .createHmac('sha256', $env.LENDLOOP_WEBHOOK_SECRET)\n  .update(`${timestamp}.${payload}`)\n  .digest('hex');\nreturn { json: { ...$json, signed: { payload, timestamp, signature } } };\n"
+      }
+    },
+    {
+      "name": "Write reminder status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CONVEX_SITE_URL }}/automation/reminders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-lendloop-timestamp",
+              "value": "={{ $json.signed.timestamp }}"
+            },
+            {
+              "name": "x-lendloop-signature",
+              "value": "={{ $json.signed.signature }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $json.signed.payload }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every day at 08:00": {
+      "main": [
+        [
+          {
+            "node": "Build overdue query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Build overdue query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build overdue query": {
+      "main": [
+        [
+          {
+            "node": "Sign query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign query": {
+      "main": [
+        [
+          {
+            "node": "Fetch overdue loans",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch overdue loans": {
+      "main": [
+        [
+          {
+            "node": "One item per loan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per loan": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reminder": {
+      "main": [
+        [
+          {
+            "node": "Sign write-back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reminder failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reminder failed": {
+      "main": [
+        [
+          {
+            "node": "Sign write-back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign write-back": {
+      "main": [
+        [
+          {
+            "node": "Write reminder status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "tags": []
+}

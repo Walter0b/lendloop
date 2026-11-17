@@ -1,0 +1,33 @@
+# Production stack. Always combined with deploy/compose.data.yml and deploy/compose.n8n.yml;
+# use the Makefile (make config, make up) rather than calling docker compose directly.
+# Convex and Clerk are managed services and are not part of this file.
+services:
+  app:
+    image: ${APP_IMAGE:?required}
+    restart: unless-stopped
+    environment:
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?required}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?required}
+      NEXT_PUBLIC_CONVEX_URL: ${NEXT_PUBLIC_CONVEX_URL:?required}
+    networks:
+      edge: { aliases: ["${APP_EDGE_ALIAS:-lendloop-app}"] }
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+
+volumes: { n8n_data: {}, postgres_data: {}, redis_data: {} }
+
+networks:
+  # Shared with the edge nginx that terminates TLS (deploy/nginx/)
+  edge: { external: true, name: "${EDGE_NETWORK:?required}" }
+  # Not internal: the n8n worker needs egress to call Convex. Postgres and Redis publish no ports.
+  backplane: {}
+
+secrets:
+  postgres_password: { file: "${SECRETS_DIR:-./secrets}/postgres_password" }
+  n8n_encryption_key: { file: "${SECRETS_DIR:-./secrets}/n8n_encryption_key" }

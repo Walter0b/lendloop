@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.production
+.env.staging
+.release-*
+backups
+next-env.d.ts
+*.tsbuildinfo
+.DS_Store

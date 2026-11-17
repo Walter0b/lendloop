@@ -1,0 +1,50 @@
+x-n8n: &n8n
+  image: ${N8N_IMAGE:?required}
+  restart: unless-stopped
+  env_file: ./deploy/n8n.production.env
+  secrets: [postgres_password, n8n_encryption_key]
+  volumes: [n8n_data:/home/node/.n8n, ./n8n:/lendloop:ro]
+  networks: [backplane]
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  mem_limit: 1g
+  cpus: 1.0
+  security_opt: [no-new-privileges:true]
+  logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+
+x-n8n-health: &n8n-health
+  # /healthz answers on the main instance, and on workers because QUEUE_HEALTH_CHECK_ACTIVE=true
+  test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  interval: 15s
+  timeout: 5s
+  start_period: 60s
+  retries: 10
+
+services:
+  # Main: editor (localhost only), webhooks, schedules, DB migrations
+  n8n:
+    <<: *n8n
+    networks:
+      edge: { aliases: ["${N8N_EDGE_ALIAS:-lendloop-n8n}"] }
+      backplane: {}
+    ports: ["127.0.0.1:${N8N_EDITOR_PORT:-5678}:5678"]
+    healthcheck: *n8n-health
+
+  # Queue worker. Scale with: deploy/compose.sh up -d --scale n8n-worker=N
+  n8n-worker:
+    <<: *n8n
+    command: ["worker", "--concurrency=5"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      n8n: { condition: service_healthy }
+    healthcheck: *n8n-health
+
+  n8n-setup:
+    <<: *n8n
+    profiles: [setup]
+    entrypoint: ["/bin/sh", "/lendloop/setup.sh"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }

@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17.6-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-n8n}
+      POSTGRES_DB: ${POSTGRES_DB:-n8n}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [backplane]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 1g
+    security_opt: [no-new-privileges:true]
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4.5-alpine}
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    restart: unless-stopped
+    volumes: [redis_data:/data]
+    networks: [backplane]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+    security_opt: [no-new-privileges:true]
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }

@@ -1,0 +1,32 @@
+{
+  "name": "lendloop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "dev:convex": "convex dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "n8n:build": "node n8n/build.mjs",
+    "lint:size": "node scripts/check-file-size.mjs"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.10.0",
+    "convex": "1.50",
+    "convex-helpers": "^0.1.135",
+    "next": "^16.4.6",
+    "react": "19.3",
+    "react-dom": "19.3"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "convex-test": "^0.0.71",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
