@@ -8,11 +8,11 @@ export function PublicToolList() {
   if (tools === undefined) return <p className="muted">Loading tools...</p>;
   if (tools.length === 0) return <p className="muted">Nothing listed yet. Be the first to lend something.</p>;
   return (
-    <ul className="chips">
+    <ul className="tool-list">
       {tools.map((tool) => (
-        <li key={tool.id} className="chip">
-          <strong>{tool.name}</strong>
-          <span className="tag">{tool.category}</span>
+        <li key={tool.id}>
+          <span>{tool.name}</span>
+          <span className="tag muted">{tool.category}</span>
         </li>
       ))}
     </ul>

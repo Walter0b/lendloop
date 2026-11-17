@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
-import { Badge } from "@/shared/ui/Badge";
 import { ErrorText } from "@/shared/ui/ErrorText";
 import { useSubmit } from "@/shared/useSubmit";
 import { RequestForm } from "@/features/lending/RequestForm";
@@ -24,7 +23,7 @@ export function ToolCard({ tool, isAdmin }: { tool: ToolView; isAdmin: boolean }
       </div>
       <p className="meta">
         <span className="tag">{tool.category}</span> · {tool.condition} · lent by {tool.mine ? "you" : tool.owner.name}
-        {tool.owner.trusted && <> <Badge tone="info">Trusted Lender</Badge></>}
+        {tool.owner.trusted && <span className="trusted"> · trusted lender</span>}
       </p>
       {tool.description && <p>{tool.description}</p>}
       <div className="row">

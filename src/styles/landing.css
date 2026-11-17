@@ -1,0 +1,14 @@
+.landing { flex: 1; width: 100%; max-width: 620px; margin: 0 auto; padding: 4.5rem 1.5rem 5rem; text-align: center; }
+.landing-logo { display: block; width: 132px; height: auto; margin: 0 auto 2.5rem; }
+.landing h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; letter-spacing: -0.035em; margin: 0 0 1.25rem; text-wrap: balance; }
+.lead { color: var(--muted); font-size: 1.05rem; max-width: 32rem; margin: 0 auto 2.25rem; text-wrap: pretty; }
+.landing .btn.primary { padding: 0.7rem 1.4rem; }
+.landing-list { margin-top: 5rem; text-align: left; }
+.landing-list h2 { text-align: center; color: var(--muted); font-weight: 500; font-size: 0.9rem; margin-bottom: 1.25rem; }
+.landing-list > .muted { text-align: center; }
+.tool-list { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.tool-list li {
+  display: flex; justify-content: space-between; gap: 1rem;
+  padding: 0.9rem 0.25rem; border-bottom: 1px solid var(--line);
+}
+.tool-list .tag { font-size: 0.875rem; }

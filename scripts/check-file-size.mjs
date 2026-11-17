@@ -1,9 +1,9 @@
-// Max 50 lines per hand-written file. README, lockfile and generated files are exempt.
+// Max 50 lines per hand-written file. README, lockfile, generated files and SVG art are exempt.
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 const MAX = 50;
-const EXEMPT = [/^README\.md$/, /^package-lock\.json$/, /^convex\/_generated\//, /^n8n\/workflows\/.*\.json$/];
+const EXEMPT = [/^README\.md$/, /^package-lock\.json$/, /^convex\/_generated\//, /^n8n\/workflows\/.*\.json$/, /\.svg$/];
 
 const files = execSync("git ls-files --cached --others --exclude-standard", { encoding: "utf8" })
   .split("\n")

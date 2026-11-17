@@ -9,14 +9,17 @@ COMPOSE := ./deploy/compose.sh
 env_value = $(shell sed -n 's/^$(1)=//p' $(ENV_FILE) 2>/dev/null | tail -n 1)
 IMAGE ?= lendloop:local
 
-# Also: init, build, health, n8n-deploy, backup, restore, convex-*, release, rollback, n8n-editor
+
 include deploy/ops.mk
 
-.PHONY: help guard config check up down ps logs
+.PHONY: help dev guard config check up down ps logs
 
 help: ## List targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z0-9-]+:.*## / {printf "  %-14s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo "  Add ENV=staging to target the staging stack."
+
+dev: ## Local dev: Convex + Next.js on :3000 (N8N=1 also starts n8n)
+	@./scripts/dev.sh
 
 guard:
 	@./scripts/validate-production-env.sh $(ENV_FILE)

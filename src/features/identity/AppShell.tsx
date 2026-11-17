@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useEnsureUser } from "./useEnsureUser";
 import { useMe } from "./useMe";
 import { ErrorText } from "@/shared/ui/ErrorText";
+import { Logo } from "@/shared/ui/Logo";
 
 const LINKS = [
   { href: "/board", label: "Board" },
@@ -23,15 +24,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/" className="brand">LendLoop</Link>
-        <nav className="nav">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className={path.startsWith(l.href) ? "active" : ""}>
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <UserButton />
+        <div className="topbar-inner">
+          <Link href="/" className="brand"><Logo variant="wide" /></Link>
+          <nav className="nav">
+            {links.map((l) => (
+              <Link key={l.href} href={l.href} className={path.startsWith(l.href) ? "active" : ""}>
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+          <UserButton />
+        </div>
       </header>
       <main className="page">
         {error ? <ErrorText message={error} />

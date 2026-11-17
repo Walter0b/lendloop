@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ConvexClientProvider } from "@/shared/ConvexClientProvider";
+import { Footer } from "@/shared/ui/Footer";
 import "@/styles/base.css";
 import "@/styles/layout.css";
 import "@/styles/components.css";
+import "@/styles/landing.css";
 
 export const metadata: Metadata = {
   title: "LendLoop",
@@ -16,7 +18,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <ClerkProvider>
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            <div className="site">
+              {children}
+              <Footer />
+            </div>
+          </ConvexClientProvider>
         </ClerkProvider>
       </body>
     </html>

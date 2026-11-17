@@ -61,6 +61,9 @@ docker compose up -d n8n                  # http://localhost:5678
 - Any user whose email ends in `@fail.test` makes the mock channel fail, to exercise the
   failure path. The loan then shows "Notification failed".
 
+After the first setup, `make dev` starts the Convex watcher and Next.js together (Ctrl+C stops
+both). `make dev N8N=1` also starts n8n in Docker.
+
 Full steps: [docs/setup.md](docs/setup.md).
 
 ## Environment variables

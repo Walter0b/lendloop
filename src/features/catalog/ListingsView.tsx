@@ -11,7 +11,7 @@ export function ListingsView() {
   return (
     <>
       <h1>My listings</h1>
-      <section className="card">
+      <section className="panel">
         <h2>Lend something</h2>
         <ToolForm submitLabel="List tool" onSubmit={create} />
       </section>

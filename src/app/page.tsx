@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Show, SignInButton } from "@clerk/nextjs";
 import { PublicToolList } from "@/features/catalog/PublicToolList";
+import { Logo } from "@/shared/ui/Logo";
 
 export default function LandingPage() {
   return (
     <main className="landing">
-      <p className="brand">LendLoop</p>
+      <Logo className="landing-logo" />
       <h1>Borrow what you need. Lend what you don&apos;t.</h1>
       <p className="lead">
         A lending board for your street. List the drill that sits in a drawer, borrow the tent you
@@ -19,7 +20,7 @@ export default function LandingPage() {
       <Show when="signed-in">
         <Link className="btn primary" href="/board">Open the board</Link>
       </Show>
-      <section className="section">
+      <section className="landing-list">
         <h2>Available right now</h2>
         <PublicToolList />
       </section>

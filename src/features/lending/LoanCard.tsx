@@ -24,7 +24,7 @@ export function LoanCard({ loan, perspective }: { loan: LoanView; perspective: "
       </div>
       <p className="meta">
         {formatDay(loan.startDate)} to {formatDay(loan.endDate)} · {who}
-        {loan.lender.trusted && perspective !== "lender" && <> <Badge tone="info">Trusted Lender</Badge></>}
+        {loan.lender.trusted && perspective !== "lender" && <span className="trusted"> · trusted lender</span>}
       </p>
       {loan.note && <p className="note">&ldquo;{loan.note}&rdquo;</p>}
       <ActivityList entries={loan.activity} />
