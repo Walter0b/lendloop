@@ -13,7 +13,8 @@ make config               # rejects placeholders, http URLs, short secrets, :lat
 export CONVEX_DEPLOY_KEY='...'   # production deploy key from the Convex dashboard
 make convex-env           # Clerk issuer, HMAC secret, n8n webhook URL into Convex
 ```
-Add [deploy/nginx/lendloop.joram.app.conf](../deploy/nginx/lendloop.joram.app.conf) to the edge
+Issue a certificate for the domain with certbot `--webroot`, then add
+[deploy/nginx/lendloop.joram.app.conf](../deploy/nginx/lendloop.joram.app.conf) to the edge
 nginx. After that, every push to `main` runs CI, pushes the image to GHCR, runs
 `npx convex deploy`, then [deploy/release.sh](../deploy/release.sh) over SSH and a smoke test.
 GitHub needs: secrets `CONVEX_DEPLOY_KEY`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`; variables

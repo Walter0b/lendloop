@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets: [postgres_password]
     volumes: [postgres_data:/var/lib/postgresql/data]
-    networks: [backplane]
+    networks: { backplane: { aliases: [lendloop-postgres] } }
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -23,7 +23,7 @@ services:
     command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
     restart: unless-stopped
     volumes: [redis_data:/data]
-    networks: [backplane]
+    networks: { backplane: { aliases: [lendloop-redis] } }
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
